@@ -1,3 +1,4 @@
+
 """
 FastAPI Main Application Module
 
@@ -39,6 +40,7 @@ from app.schemas.calculation import CalculationBase, CalculationResponse, Calcul
 from app.schemas.token import TokenResponse  # API token schema
 from app.schemas.user import UserCreate, UserResponse, UserLogin  # User schemas
 from app.database import Base, get_db, engine  # Database connection
+from app.reports import router as reports_router
 
 
 # ------------------------------------------------------------------------------
@@ -69,6 +71,11 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan  # Pass our lifespan context manager
 )
+
+app.include_router(reports_router)
+
+
+
 
 # ------------------------------------------------------------------------------
 # Static Files and Templates Configuration
