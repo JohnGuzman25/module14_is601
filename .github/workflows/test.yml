@@ -1,106 +1,57 @@
-name: CI/CD
+name: Tests
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ main ]
+    branches: [ "main" ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
     services:
       postgres:
-        image: postgres:latest
+        image: postgres:16
         env:
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: password
-          POSTGRES_DB: mytestdb  # <-- Dedicated test DB name
+          POSTGRES_USER: project14
+          POSTGRES_PASSWORD: project14
+          POSTGRES_DB: project14
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-          
-      - uses: actions/cache@v3
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-pip-
-      
-      - name: Install dependencies
-        env:
-          DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
-        run: |
-          python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          playwright install  # if you use Playwright for e2e tests
-      
-      - name: Run tests
-        env:
-          DATABASE_URL: postgresql://user:password@localhost:5432/mytestdb
-        run: |
-          source venv/bin/activate
-          
-          # 1) Unit tests
-          pytest tests/unit/ --cov=src --junitxml=test-results/junit.xml
-          
-          # 2) Integration tests
-          pytest tests/integration/
-          
-          # 3) E2E or other tests
-          pytest tests/e2e/
+          --health-cmd="pg_isready -U project14 -d project14"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
 
-  security:
-    needs: test
-    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgresql+psycopg2://project14:project14@localhost:5432/project14
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Build image
-        run: docker build -t app:test .
-      
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          image-ref: 'app:test'
-          format: 'table'
-          exit-code: '1'
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
-  
-  deploy:
-    needs: security
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-      
-      - uses: docker/setup-buildx-action@v3
-      
-      - uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-          
-      - uses: docker/build-push-action@v5
-        with:
-          push: true
-          tags: |
-            kaw393939/601_module9:latest
-            kaw393939/601_module9:${{ github.sha }}
-          platforms: linux/amd64,linux/arm64
-          cache-from: type=registry,ref=kaw393939/601_module9:cache
-          cache-to: type=inline,mode=max
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Postgres client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Wait for Postgres
+        run: |
+          for i in {1..30}; do
+            pg_isready -h localhost -p 5432 -U project14 -d project14 && break
+            sleep 2
+          done
+
+      - name: Run tests
+        run: pytest
+
