@@ -72,9 +72,6 @@ app = FastAPI(
     lifespan=lifespan  # Pass our lifespan context manager
 )
 
-app.include_router(reports_router)
-
-
 
 
 # ------------------------------------------------------------------------------
